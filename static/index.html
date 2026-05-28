@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en" class="has-background-dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPSY Option Protection Engine</title>
+    <!-- Bulma CSS Framework -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #f1f5f9;
+        }
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .card {
+            background-color: #0f172a;
+            border: 1px solid #1e293b;
+            color: #f1f5f9;
+        }
+        .input {
+            background-color: #0f172a;
+            color: #f1f5f9;
+            border-color: #334155;
+        }
+        .input:focus {
+            border-color: #10b981;
+            box-shadow: none;
+        }
+        .tag-special {
+            background-color: #064e3b;
+            color: #34d399;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="py-6 px-4">
+    <div class="container max-w-5xl">
+        
+        <!-- Header -->
+        <header class="mb-6 text-center">
+            <h1 class="title is-3 has-text-white font-weight-bold">
+                🛡️ CPSY Option Greeks Replicator Engine
+            </h1>
+            <p class="subtitle is-6 has-text-grey-light mt-1">
+                Real-Time 100% Principal Protected Collar Replicator via Yahoo! Finance
+            </p>
+        </header>
+
+        <!-- Main Workspace -->
+        <div class="columns is-multiline">
+            
+            <!-- Controls Panel -->
+            <div class="column is-4">
+                <div class="card p-5">
+                    <h2 class="title is-5 has-text-white mb-4">Stock Query Directive</h2>
+                    
+                    <div class="field">
+                        <label class="label has-text-grey-light">Ticker Symbol</label>
+                        <div class="control">
+                            <input class="input" type="text" id="ticker-input" value="SPY" placeholder="e.g. SPY, AAPL, QQQ">
+                        </div>
+                    </div>
+
+                    <button class="button is-emerald is-fullwidth has-background-emerald-580 has-text-black font-weight-bold" id="fetch-btn" onclick="fetchStrategy()">
+                        Analyze Ticker
+                    </button>
+
+                    <hr class="has-background-grey-dark">
+
+                    <label class="label has-text-grey-light">Target Protection Duration</label>
+                    <div class="field">
+                        <div class="control">
+                            <div class="select is-fullwidth">
+                                <select id="date-select" onchange="onDateChanged()">
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Strategy Blueprint Panel -->
+            <div class="column is-8">
+                <div id="loader" class="has-text-center py-6 is-hidden">
+                    <p class="subtitle is-5 has-text-grey-light">Aggregating real-time Option Contract spreads from Yahoo Finance...</p>
+                </div>
+
+                <div id="strategy-card" class="card p-5 is-hidden">
+                    <div class="is-flex is-justify-content-space-between is-align-items-center mb-4 pb-2 border-bottom">
+                        <div>
+                            <span class="tag tag-special" id="ticker-badge">SPY</span>
+                            <span class="ml-2 has-text-weight-bold">Spot Price: $<span id="spot-price">0.00</span></span>
+                        </div>
+                        <span class="has-text-grey-light text-xs">Maturity: <strong class="has-text-white" id="maturity-display">2027-05-18</strong></span>
+                    </div>
+
+                    <!-- Metrics Grid -->
+                    <div class="columns">
+                        <div class="column">
+                            <div class="has-background-black-bis p-4 rounded text-center">
+                                <p class="is-size-7 has-text-grey">100% PRINCIPAL FLOOR</p>
+                                <p class="is-size-4 has-text-emerald-400 font-weight-bold">$<span id="metric-floor">0.00</span></p>
+                                <p class="is-size-7 has-text-success">Downside Term Risk: 0.00%</p>
+                            </div>
+                        </div>
+                        <div class="column">
+                            <div class="has-background-black-bis p-4 rounded text-center">
+                                <p class="is-size-7 has-text-grey font-weight-bold">ABSOLUTE RETURN CAP</p>
+                                <p class="is-size-4 has-text-sky-400 font-weight-bold">$<span id="metric-cap">0.00</span></p>
+                                <p class="is-size-7 has-text-sky-200">Max Gross Gain: +<span id="gain-pct">0.00</span>%</p>
+                            </div>
+                        </div>
+                        <div class="column">
+                            <div class="has-background-black-bis p-4 rounded text-center">
+                                <p class="is-size-7 has-text-grey font-weight-bold">OFFSETTING CREDIT</p>
+                                <p class="is-size-4 has-text-warning font-weight-bold">$<span id="metric-credit">0.00</span></p>
+                                <p class="is-size-7 has-text-warning-light">Net Premium Base Offset</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Leg Matrix -->
+                    <h3 class="subtitle is-6 has-text-white font-weight-bold mt-4 mb-2">Replication Bundle Legs:</h3>
+                    <div class="content is-small">
+                        <ol>
+                            <li>
+                                <strong>High-Delta Call replacement:</strong> BUY TO OPEN strike <span class="has-text-warning" id="leg-call-strike">0.00</span> Call @ $<span id="leg-call-cost">0.00</span>.
+                            </li>
+                            <li>
+                                <strong>Automated downside stop floor:</strong> BUY TO OPEN strike <span class="has-text-emerald-400" id="leg-put-strike">0.00</span> Put @ $<span id="leg-put-cost">0.00</span>.
+                            </li>
+                            <li>
+                                <strong>Cost Funding Ceiling limit:</strong> SELL TO OPEN strike <span class="has-text-sky-400" id="leg-short-strike">0.00</span> Call @ $<span id="leg-short-credit">0.00</span>.
+                            </li>
+                        </ol>
+                    </div>
+
+                    <!-- Blueprint Download Actions -->
+                    <div class="mt-5">
+                        <button class="button is-dark border is-fullwidth has-text-emerald-400" onclick="downloadBlueprintFile()">
+                            📥 Download Step-By-Step IBKR Blueprint (.txt)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Global State -->
+    <script>
+        let currentStrategyState = null;
+
+        async function fetchStrategy(specificDate = "") {
+            const ticker = document.getElementById('ticker-input').value.trim();
+            const loader = document.getElementById('loader');
+            const dataCard = document.getElementById('strategy-card');
+            
+            loader.classList.remove('is-hidden');
+            dataCard.classList.add('is-hidden');
+
+            try {
+                let url = `/api/strategy?ticker=${encodeURIComponent(ticker)}`;
+                if (specificDate) url += `&date=${specificDate}`;
+                
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (data.error) {
+                    alert("Error: " + data.error);
+                    loader.classList.add('is-hidden');
+                    return;
+                }
+
+                currentStrategyState = data;
+                renderStrategyUI(data);
+
+            } catch (err) {
+                alert("Runtime dynamic collection error: " + err);
+            } finally {
+                loader.classList.add('is-hidden');
+            }
+        }
+
+        function renderStrategyUI(data) {
+            const s = data.strategy;
+            document.getElementById('ticker-badge').innerText = data.ticker;
+            document.getElementById('spot-price').innerText = data.spotPrice.toFixed(2);
+            document.getElementById('maturity-display').innerText = data.selectedDate;
+            
+            document.getElementById('metric-floor').innerText = s.putStrike.toFixed(2);
+            document.getElementById('metric-cap').innerText = s.shortCallStrike.toFixed(2);
+            document.getElementById('metric-credit').innerText = s.shortCallCredit.toFixed(2);
+            document.getElementById('gain-pct').innerText = s.grossCapPercent.toFixed(2);
+
+            document.getElementById('leg-call-strike').innerText = s.deepCallStrike.toFixed(2);
+            document.getElementById('leg-call-cost').innerText = s.deepCallCost.toFixed(2);
+            document.getElementById('leg-put-strike').innerText = s.putStrike.toFixed(2);
+            document.getElementById('leg-put-cost').innerText = s.putCost.toFixed(2);
+            document.getElementById('leg-short-strike').innerText = s.shortCallStrike.toFixed(2);
+            document.getElementById('leg-short-credit').innerText = s.shortCallCredit.toFixed(2);
+
+            // Redraw date selector dropdown only if dates aren't rendered or changing ticker
+            const selectEl = document.getElementById('date-select');
+            selectEl.innerHTML = "";
+            data.allDates.forEach(date => {
+                const opt = document.createElement('option');
+                opt.value = date;
+                opt.innerText = date;
+                if (date === data.selectedDate) opt.selected = true;
+                selectEl.appendChild(opt);
+            });
+
+            document.getElementById('strategy-card').classList.remove('is-hidden');
+        }
+
+        function onDateChanged() {
+            const date = document.getElementById('date-select').value;
+            fetchStrategy(date);
+        }
+
+        function downloadBlueprintFile() {
+            if (!currentStrategyState) return;
+            const s = currentStrategyState.strategy;
+            const ticker = currentStrategyState.ticker;
+
+            const content = `================================================================================
+          DETAILED STEP-BY-STEP NEWBIE IMPLEMENTATION GUIDE
+================================================================================
+
+How To Manually Enter This Strategy on IBKR Pro:
+
+A options collar of this type is best executed as a Single "Multi-Leg Combo" Order inside the Trader Workstation (TWS) or the IBKR Mobile/Client Portal. Entering all 3 legs in one combo order ensures simultaneous execution, guarantees your net premium pricing, and prevents lag slippage.
+
+1. ACCESS COMBO BUILDER:
+   - Search for the underlying ticker "${ticker}".
+   - Click the "OptionChain" button or tap "Options".
+   - Enable "Strategy Builder" (on the bottom or top bar). This switches the view to multi-leg construction.
+
+2. ASSEMBLE THE BUNDLE LEGS:
+   - Leg 1: Deep In-the-Money CALL
+     Action: Select BUY on the Call side for Strike $${s.deepCallStrike.toFixed(2)}. This represents your long reference asset with high delta.
+   - Leg 2: At-The-Money Protective PUT
+     Action: Select BUY on the Put side for Strike $${s.putStrike.toFixed(2)}. This secures your solid downside insurance floor.
+   - Leg 3: Out-of-The-Money Cap CALL
+     Action: Select SELL on the Call side for Strike $${s.shortCallStrike.toFixed(2)}. This yields credit that offsets the insurance cost, giving you a Gross Cap limit of +${s.grossCapPercent.toFixed(2)}%.
+
+3. REVIEW AND CONFIRM PRICING:
+   - Check the Net Debit price displayed by the Strategy Builder.
+   - Submit as a "LMT" (Limit) Combo order to specify your max desired net price.
+
+================================================================================
+          "SET & FORGET" AUTOMATED COMFORT GUIDE (IBKR PRO ONLY)
+================================================================================
+
+A critical advantage of this collar is defining your outcome bounds beforehand. Follow these instructions inside Interactive Brokers to automate both your Stop Loss and Take Profit exits, so you don't need to constantly watch the market:
+
+--- DETAILED STOP LOSS FLOOR GUIDE (Contractual Security) ---
+
+1. UNDERSTAND THE PUT GUARD:
+   - Traditional stock holders place standard Stop-Market orders. DO NOT do this! If ${ticker} crashes overnight, a standard market stop order sells your shares at extremely low opens, disregarding your floor level!
+   - Because you hold the Step 2 Put option with Strike $${s.putStrike.toFixed(2)}, your right to sell is contractually secured. No matter how low the stock drops, your absolute floor value is preserved.
+
+2. SETTING UP ACTIVE EARLY UNWIND ON DECLINE (Optional):
+   - To extract your cash immediately if the stock falls through the Put Strike of $${s.putStrike.toFixed(2)}, you can create a "Conditional Order" in IBKR.
+   - Open standard Order Entry, select **CLOSE** on your multi-leg combo option bundle.
+   - In the Order Ticket, click the **Trigger / Conditional** tab.
+   - Click **Add Condition**.
+   - Set Condition Type = **Price**.
+   - Select Ticker = **${ticker}**.
+   - Set operator to **"<="** (Less than or equal to).
+   - Enter threshold price = **$${s.putStrike.toFixed(2)}**.
+   - Set validity of this conditional trigger to **GTC** (Good-Til-Canceled).
+   - Submit the trade. This ensures that if the stock falls below your floor strike, the platform triggers a market or close-limit unwind to close all your collar positions at once automatically, extracting your floor equity.
+
+--- DETAILED TAKE PROFIT EXIT GUIDE (Locked Yield Ceiling) ---
+
+To lock in your absolute maximum profits when the stock rallies without premium decay or tail risk at expiration, automate your exit at your short call cap strike:
+
+1. CONFIGURE CONDITIONAL TRIGGER ALERT:
+   - Go to your open positions list in Trader Workstation or Client Portal.
+   - Select your multi-leg option combo.
+   - Choose **Close** to open the Order Ticket.
+   - Click the **Trigger / Conditional** tab.
+   - Click **Add Condition** inside the ticket.
+   - Select Condition Type = **Price**.
+   - Input Ticker = **${ticker}**.
+   - Set the Operator trigger to **">="** (Greater than or equal to).
+   - Input Threshold Price = **$${s.shortCallStrike.toFixed(2)}**.
+   - Under the order ticket primary values, make sure the Order Type is **MKT** (Market) or an aggressive limit to ensure execution.
+   - CRITICAL: Change Time-In-Force (TIF) from "DAY" to **GTC** (Good-Til-Canceled). This ensures the rule persists over months.
+   - Submit. This tells the IBKR server: "If ${ticker} rises to or past $${s.shortCallStrike.toFixed(2)}, instantly submit a trade to execute a multi-leg combination close." This automatically secures your max cap gain of +${s.grossCapPercent.toFixed(2)}% without manual intervention!`;
+
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `IBKR_SetAndForget_Blueprint_${ticker}.txt`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Run analysis on load
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchStrategy();
+        });
+    </script>
+</body>
+</html>
